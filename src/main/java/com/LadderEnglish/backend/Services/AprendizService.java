@@ -137,38 +137,40 @@ public class AprendizService {
                 Row row = sheet.getRow(i);
                 if (row == null) continue;
 
-                // Leer las celdas con seguridad
-                String tipoDocumento = getCellValue(row.getCell(0));
-                String numeroDocumento = getCellValue(row.getCell(1));
-                String nombres = getCellValue(row.getCell(2));
-                String apellidos = getCellValue(row.getCell(3));
-                String celular = getCellValue(row.getCell(4));
-                String correo = getCellValue(row.getCell(5));
-                String estado = getCellValue(row.getCell(6));
-                String ingles1 = getCellValue(row.getCell(7));
-                String ingles2 = getCellValue(row.getCell(8));
-                String ingles3 = getCellValue(row.getCell(9));
+                // Leer las celdas con seguridad (permite valores vacíos)
+                String tipoDocumento = getCellValueOrEmpty(row.getCell(0));
+                String numeroDocumento = getCellValueOrEmpty(row.getCell(1));
+                String nombres = getCellValueOrEmpty(row.getCell(2));
+                String apellidos = getCellValueOrEmpty(row.getCell(3));
+                String celular = getCellValueOrEmpty(row.getCell(4));
+                String correo = getCellValueOrEmpty(row.getCell(5));
+                String estado = getCellValueOrEmpty(row.getCell(6));
+                String ingles1 = getCellValueOrEmpty(row.getCell(7));
+                String ingles2 = getCellValueOrEmpty(row.getCell(8));
+                String ingles3 = getCellValueOrEmpty(row.getCell(9));
 
-                // Saltar si faltan datos críticos
-                if (numeroDocumento == null || nombres == null || apellidos == null)
+                // Saltar si faltan datos críticos (número de documento mínimo requerido)
+                if (numeroDocumento.isEmpty() || nombres.isEmpty() || apellidos.isEmpty())
                     continue;
 
-                // Evitar nulos en los campos NOT NULL
-                if (ingles1 == null) ingles1 = "NO APLICA";
-                if (ingles2 == null) ingles2 = "NO APLICA";
-                if (ingles3 == null) ingles3 = "NO APLICA";
-
                 Aprendiz aprendiz = new Aprendiz();
-                aprendiz.setTipoDocumento(tipoDocumento);
-                aprendiz.setNumeroDocumento(Long.valueOf(numeroDocumento));
+                aprendiz.setTipoDocumento(tipoDocumento.isEmpty() ? null : tipoDocumento);
+
+                // Convertir número de documento solo si no está vacío
+                try {
+                    aprendiz.setNumeroDocumento(Long.valueOf(numeroDocumento));
+                } catch (NumberFormatException e) {
+                    continue; // Saltar si el número de documento no es válido
+                }
+
                 aprendiz.setNombres(nombres);
                 aprendiz.setApellidos(apellidos);
-                aprendiz.setCelular(celular);
-                aprendiz.setCorreo(correo);
-                aprendiz.setEstado(estado);
-                aprendiz.setEstadoIngles1(ingles1);
-                aprendiz.setEstadoIngles2(ingles2);
-                aprendiz.setEstadoIngles3(ingles3);
+                aprendiz.setCelular(celular.isEmpty() ? null : celular);
+                aprendiz.setCorreo(correo.isEmpty() ? null : correo);
+                aprendiz.setEstado(estado.isEmpty() ? null : estado);
+                aprendiz.setEstadoIngles1(ingles1.isEmpty() ? null : ingles1);
+                aprendiz.setEstadoIngles2(ingles2.isEmpty() ? null : ingles2);
+                aprendiz.setEstadoIngles3(ingles3.isEmpty() ? null : ingles3);
                 aprendiz.setFicha(ficha);
 
                 aprendizRepository.save(aprendiz);
@@ -191,12 +193,29 @@ public class AprendizService {
         return responseDTO;
     }
 
-    private String getCellValue(Cell cell) {
-        if (cell == null) return null;
-        DataFormatter formatter = new DataFormatter();
-        String value = formatter.formatCellValue(cell);
-        if (value == null || value.trim().isEmpty()) return null;
-        return value.trim();
+    private String getCellValueOrEmpty(Cell cell) {
+        if (cell == null) {
+            return "";
+        }
+
+        switch (cell.getCellType()) {
+            case STRING:
+                return cell.getStringCellValue().trim();
+            case NUMERIC:
+                if (DateUtil.isCellDateFormatted(cell)) {
+                    return cell.getDateCellValue().toString();
+                }
+                // Convierte números a string sin notación científica
+                return String.valueOf((long) cell.getNumericCellValue());
+            case BOOLEAN:
+                return String.valueOf(cell.getBooleanCellValue());
+            case FORMULA:
+                return cell.getCellFormula();
+            case BLANK:
+                return "";
+            default:
+                return "";
+        }
     }
 
     private static Aprendiz getAprendiz(AprendizRequestDTO aprendizRequestDTO) {
