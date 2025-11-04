@@ -20,6 +20,10 @@ public class FichasService {
         this.fichaRepository = fichaRepository;
     }
 
+    public List<Ficha> obtenerFichasActivas() {
+       return fichaRepository.findAllByEstado("activo");
+    }
+
     public List<Ficha> obtenerFichas() {
         return fichaRepository.findAll();
     }
@@ -32,6 +36,7 @@ public class FichasService {
         Ficha ficha = new Ficha();
         ficha.setNumeroFicha(fichaRequestDTO.getNumeroFicha());
         ficha.setNombreFicha(fichaRequestDTO.getNombreFicha());
+        ficha.setEstado(fichaRequestDTO.getEstado());
         fichaRepository.save(ficha);
 
         ResponseDTO response = new ResponseDTO();
@@ -58,6 +63,7 @@ public class FichasService {
 
         fichaExistente.setNumeroFicha(fichaRequestDTO.getNumeroFicha());
         fichaExistente.setNombreFicha(fichaRequestDTO.getNombreFicha());
+        fichaExistente.setEstado(fichaRequestDTO.getEstado());
         fichaRepository.save(fichaExistente);
 
         response.setStatus(200);

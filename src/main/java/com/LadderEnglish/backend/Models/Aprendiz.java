@@ -30,6 +30,8 @@ public class Aprendiz {
     @Column(name = "estado_ingles3")
     private String estadoIngles3;
     @Column
+    private String observacion;
+    @Column
     private String estado;
     @ManyToOne
     @JoinColumn(name = "id_ficha", referencedColumnName = "id_ficha")

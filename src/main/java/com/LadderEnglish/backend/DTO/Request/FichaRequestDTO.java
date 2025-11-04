@@ -6,4 +6,5 @@ import lombok.Data;
 public class FichaRequestDTO {
     private Long numeroFicha;
     private String nombreFicha;
+    private String estado;
 }

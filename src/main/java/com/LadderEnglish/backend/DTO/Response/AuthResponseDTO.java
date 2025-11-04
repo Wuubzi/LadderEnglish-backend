@@ -8,5 +8,6 @@ public class AuthResponseDTO {
     private String message;
     private String url;
     private String token;
+    private String rol;
     private String timestamp;
 }

@@ -45,6 +45,11 @@ public class AprendizController {
         return new ResponseEntity<>(aprendizService.cargarAprendices(request, idFicha,file), HttpStatus.OK);
     }
 
+    @GetMapping("/exportarAprendices")
+    public ResponseEntity<byte[]> exportarAprendices(@RequestParam Long idFicha) {
+        return aprendizService.exportarAprendices(idFicha);
+    }
+    
     @PutMapping("/editarAprendiz")
     public ResponseDTO editarAprendiz(
             @RequestParam Long idAprendiz,

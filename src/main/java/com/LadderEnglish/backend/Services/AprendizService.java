@@ -1,24 +1,28 @@
 package com.LadderEnglish.backend.Services;
 
 import com.LadderEnglish.backend.DTO.Request.AprendizRequestDTO;
-import com.LadderEnglish.backend.DTO.Response.AuthResponseDTO;
 import com.LadderEnglish.backend.DTO.Response.ResponseDTO;
 import com.LadderEnglish.backend.Models.Aprendiz;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import com.LadderEnglish.backend.Models.Ficha;
 import com.LadderEnglish.backend.Repositories.AprendizRepository;
 import com.LadderEnglish.backend.Repositories.FichaRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.PostMapping;
+import java.io.ByteArrayOutputStream;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -50,7 +54,7 @@ public class AprendizService {
 
             return aprendizOptional.get();
         } catch (Exception e) {
-          throw new RuntimeException(e);
+            throw new RuntimeException(e);
         }
     }
 
@@ -76,6 +80,7 @@ public class AprendizService {
             aprendizExistente.setCelular(aprendizRequestDTO.getCelular());
             aprendizExistente.setCorreo(aprendizRequestDTO.getCorreo());
             aprendizExistente.setEstado(aprendizRequestDTO.getEstado());
+            aprendizExistente.setObservacion(aprendizRequestDTO.getObservacion());
             aprendizExistente.setEstadoIngles1(aprendizRequestDTO.getEstadoIngles1());
             aprendizExistente.setEstadoIngles2(aprendizRequestDTO.getEstadoIngles2());
             aprendizExistente.setEstadoIngles3(aprendizRequestDTO.getEstadoIngles3());
@@ -148,6 +153,7 @@ public class AprendizService {
                 String ingles1 = getCellValueOrEmpty(row.getCell(7));
                 String ingles2 = getCellValueOrEmpty(row.getCell(8));
                 String ingles3 = getCellValueOrEmpty(row.getCell(9));
+                String observacion = getCellValueOrEmpty(row.getCell(10));
 
                 // Saltar si faltan datos críticos (número de documento mínimo requerido)
                 if (numeroDocumento.isEmpty() || nombres.isEmpty() || apellidos.isEmpty())
@@ -171,6 +177,7 @@ public class AprendizService {
                 aprendiz.setEstadoIngles1(ingles1.isEmpty() ? null : ingles1);
                 aprendiz.setEstadoIngles2(ingles2.isEmpty() ? null : ingles2);
                 aprendiz.setEstadoIngles3(ingles3.isEmpty() ? null : ingles3);
+                aprendiz.setObservacion(observacion.isEmpty() ? null : observacion);
                 aprendiz.setFicha(ficha);
 
                 aprendizRepository.save(aprendiz);
@@ -218,6 +225,165 @@ public class AprendizService {
         }
     }
 
+    public ResponseEntity<byte[]> exportarAprendices(Long idFicha) {
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Reporte de Aprendices");
+
+            // Obtener la ficha
+            Ficha ficha = fichaRepository.findById(idFicha)
+                    .orElseThrow(() -> new RuntimeException("Ficha no encontrada"));
+
+            // Obtener todos los aprendices de la ficha
+            List<Aprendiz> aprendices = aprendizRepository.findAllByFicha_IdFicha(idFicha);
+
+            // Crear estilos
+            CellStyle headerStyle = createHeaderStyle(workbook);
+            CellStyle titleStyle = createTitleStyle(workbook);
+            CellStyle dataStyle = createDataStyle(workbook);
+            CellStyle labelStyle = createLabelStyle(workbook);
+
+            int rowNum = 0;
+
+            // Título principal - fusionado en todas las columnas
+            Row titleRow = sheet.createRow(rowNum++);
+            Cell titleCell = titleRow.createCell(0);
+            titleCell.setCellValue("Reporte de Aprendices");
+            titleCell.setCellStyle(titleStyle);
+            sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 11));
+
+            rowNum++; // Fila vacía
+
+            // Información de caracterización con datos reales de la ficha
+            String fichaInfo = ficha.getNumeroFicha() + " - " + ficha.getNombreFicha();
+            createInfoRow(sheet, rowNum++, "Ficha de Caracterización:", fichaInfo, labelStyle, dataStyle);
+            createInfoRow(sheet, rowNum++, "Estado:", ficha.getEstado(), labelStyle, dataStyle);
+            createInfoRow(sheet, rowNum++, "Fecha del Reporte:",
+                    LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
+                    labelStyle, dataStyle);
+
+            rowNum++; // Fila vacía
+
+            // Encabezados de la tabla - ahora incluye las columnas de inglés
+            Row headerRow = sheet.createRow(rowNum++);
+            String[] headers = {"Tipo de Documento", "Número de Documento", "Nombre",
+                    "Apellidos", "Celular", "Correo Electrónico", "Estado",
+                    "INGLES 1", "INGLES 2", "INGLES 3", "Observacion"};
+
+            for (int i = 0; i < headers.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers[i]);
+                cell.setCellStyle(headerStyle);
+            }
+
+            // Datos de aprendices con información de inglés
+            for (Aprendiz aprendiz : aprendices) {
+                Row row = sheet.createRow(rowNum++);
+
+                createCell(row, 0, aprendiz.getTipoDocumento(), dataStyle);
+                createCell(row, 1, String.valueOf(aprendiz.getNumeroDocumento()), dataStyle);
+                createCell(row, 2, aprendiz.getNombres(), dataStyle);
+                createCell(row, 3, aprendiz.getApellidos(), dataStyle);
+                createCell(row, 4, aprendiz.getCelular(), dataStyle);
+                createCell(row, 5, aprendiz.getCorreo(), dataStyle);
+                createCell(row, 6, aprendiz.getEstado(), dataStyle);
+
+                // Columnas de inglés
+                createCell(row, 7, aprendiz.getEstadoIngles1(), dataStyle);
+                createCell(row, 8, aprendiz.getEstadoIngles2(), dataStyle);
+                createCell(row, 9, aprendiz.getEstadoIngles3(), dataStyle);
+                createCell(row, 10, aprendiz.getObservacion(), dataStyle);
+            }
+
+            // Ajustar anchos de columna
+            for (int i = 0; i < 11; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            // Convertir a bytes
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            workbook.write(outputStream);
+
+            String filename = "Reporte_Aprendices_" +
+                    LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) +
+                    ".xlsx";
+
+            // Devolver el archivo
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)
+                    .contentType(MediaType.parseMediaType(
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .body(outputStream.toByteArray());
+
+        } catch (IOException e) {
+            throw new RuntimeException("Error al exportar aprendices a Excel", e);
+        }
+    }
+
+    private void createInfoRow(Sheet sheet, int rowNum, String label, String value,
+                               CellStyle labelStyle, CellStyle dataStyle) {
+        Row row = sheet.createRow(rowNum);
+        Cell labelCell = row.createCell(0);
+        labelCell.setCellValue(label);
+        labelCell.setCellStyle(labelStyle);
+
+        Cell valueCell = row.createCell(1);
+        valueCell.setCellValue(value);
+        valueCell.setCellStyle(dataStyle);
+        sheet.addMergedRegion(new CellRangeAddress(rowNum, rowNum, 1, 3));
+    }
+
+    private void createCell(Row row, int column, String value, CellStyle style) {
+        Cell cell = row.createCell(column);
+        cell.setCellValue(value != null ? value : "");
+        cell.setCellStyle(style);
+    }
+
+    private CellStyle createTitleStyle(Workbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        Font font = workbook.createFont();
+        font.setBold(true);
+        font.setFontHeightInPoints((short) 16);
+        style.setFont(font);
+        style.setAlignment(HorizontalAlignment.CENTER);
+        style.setVerticalAlignment(VerticalAlignment.CENTER);
+        return style;
+    }
+
+    private CellStyle createHeaderStyle(Workbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        Font font = workbook.createFont();
+        font.setBold(true);
+        font.setColor(IndexedColors.WHITE.getIndex());
+        style.setFont(font);
+        style.setFillForegroundColor(IndexedColors.GREY_50_PERCENT.getIndex());
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        style.setBorderBottom(BorderStyle.THIN);
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        style.setAlignment(HorizontalAlignment.CENTER);
+        return style;
+    }
+
+    private CellStyle createDataStyle(Workbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        style.setBorderBottom(BorderStyle.THIN);
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        style.setWrapText(true);
+        return style;
+    }
+
+    private CellStyle createLabelStyle(Workbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        Font font = workbook.createFont();
+        font.setBold(true);
+        style.setFont(font);
+        return style;
+    }
+
+
     private static Aprendiz getAprendiz(AprendizRequestDTO aprendizRequestDTO) {
         Aprendiz aprendiz = new Aprendiz();
         aprendiz.setTipoDocumento(aprendizRequestDTO.getTipoDocumento());
@@ -226,6 +392,7 @@ public class AprendizService {
         aprendiz.setApellidos(aprendizRequestDTO.getApellidos());
         aprendiz.setCelular(aprendizRequestDTO.getCelular());
         aprendiz.setCorreo(aprendizRequestDTO.getCorreo());
+        aprendiz.setObservacion(aprendizRequestDTO.getObservacion());
         aprendiz.setEstadoIngles1(aprendizRequestDTO.getEstadoIngles1());
         aprendiz.setEstadoIngles2(aprendizRequestDTO.getEstadoIngles2());
         aprendiz.setEstadoIngles3(aprendizRequestDTO.getEstadoIngles3());

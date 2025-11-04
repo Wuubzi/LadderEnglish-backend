@@ -64,6 +64,7 @@ public class AuthService {
             authResponseDTO.setMessage("Inicio de sesión exitoso");
             authResponseDTO.setUrl(request.getRequestURI().replace(request.getContextPath(), ""));
             authResponseDTO.setTimestamp(LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
+            authResponseDTO.setRol(usuario.getRol());
             authResponseDTO.setToken(token);
             return authResponseDTO;
 

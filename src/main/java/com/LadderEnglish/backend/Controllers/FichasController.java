@@ -29,6 +29,11 @@ public class FichasController {
         return fichasService.obtenerFichas();
     }
 
+    @GetMapping("/obtenerFichasActivas")
+    public List<Ficha> obtenerFichasActivas() {
+        return fichasService.obtenerFichasActivas();
+    }
+
     @GetMapping("/obtenerFicha")
     public Ficha obtenerFicha(@RequestParam Long idFicha) {
         return fichasService.obtenerFicha(idFicha);

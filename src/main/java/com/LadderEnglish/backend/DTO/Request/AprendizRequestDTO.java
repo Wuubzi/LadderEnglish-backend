@@ -14,5 +14,6 @@ public class AprendizRequestDTO {
     private String estadoIngles1;
     private String estadoIngles2;
     private String estadoIngles3;
+    private String observacion;
     private Long idFicha;
 }

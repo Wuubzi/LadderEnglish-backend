@@ -18,6 +18,8 @@ public class Ficha {
     private Long numeroFicha;
     @Column(name = "nombre_ficha")
     private String nombreFicha;
+    @Column(name = "estado")
+    private String estado;
     @OneToMany(mappedBy = "ficha", cascade = CascadeType.ALL)
     @JsonIgnore
     private List<Aprendiz> aprendices;
